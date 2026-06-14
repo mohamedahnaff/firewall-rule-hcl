@@ -1,0 +1,22 @@
+cr_number: "CHG0030001"
+requested_by: "System Administrator"
+change_environment: "dev"
+target_host: "target1"
+change_ticket_status: "approved"
+maintenance_window: "2026-06-11 15:30-16:30"
+
+firewall_change:
+  state: "present"          # present or absent
+  action: "allow"           # allow or deny
+  direction: "inbound"
+  protocol: "tcp"
+  port: 443
+  source: "10.10.20.0/24"
+  description: "Allow HTTPS from approved source subnet"
+
+old_rule:
+  enabled: false
+  action: "allow"
+  protocol: "tcp"
+  port: 8443
+  source: "10.10.20.0/24"

@@ -1,0 +1,9 @@
+---
+- name: Firewall change backup
+  hosts: linux_firewall
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/change_request.yml
+  roles:
+    - firewall_backup

@@ -1,0 +1,87 @@
+---
+- name: Validate mandatory variables
+  ansible.builtin.assert:
+    that:
+      - cr_number is defined
+      - cr_number | length > 0
+      - requested_by is defined
+      - change_environment is defined
+      - target_host is defined
+      - firewall_change is defined
+      - firewall_change.state in ['present', 'absent']
+      - firewall_change.action in ['allow', 'deny']
+      - firewall_change.protocol in ['tcp', 'udp']
+      - firewall_change.port | int > 0
+      - firewall_change.port | int <= 65535
+      - firewall_change.source is match('^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$')
+      - change_ticket_status == 'approved'
+    fail_msg: "CR input validation failed. Check vars/change_request.yml"
+    success_msg: "CR input validation passed."
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Fail if firewalld is not installed
+  ansible.builtin.fail:
+    msg: "firewalld service not found on target host. This workflow currently supports firewalld only."
+  when: "'firewalld.service' not in ansible_facts.services"
+
+- name: Fail if firewalld is not running
+  ansible.builtin.fail:
+    msg: "firewalld is installed but not running."
+  when: ansible_facts.services['firewalld.service'].state != 'running'
+
+- name: Set firewalld decision
+  ansible.builtin.set_fact:
+    fw_decision: "{{ 'accept' if firewall_change.action == 'allow' else 'reject' }}"
+
+- name: Build desired rich rule
+  ansible.builtin.set_fact:
+    desired_rich_rule: 'rule family="{{ firewall_family }}" source address="{{ firewall_change.source }}" port port="{{ firewall_change.port }}" protocol="{{ firewall_change.protocol }}" {{ fw_decision }}'
+
+- name: Get current rich rules
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-rich-rules
+  register: current_rich_rules
+  changed_when: false
+
+- name: Get current zone details
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-all
+  register: current_zone_details
+  changed_when: false
+
+- name: Check whether desired rule already exists
+  ansible.builtin.set_fact:
+    rule_already_exists: "{{ desired_rich_rule in current_rich_rules.stdout }}"
+
+- name: Build state file structure
+  ansible.builtin.set_fact:
+    firewall_state:
+      cr_number: "{{ cr_number }}"
+      requested_by: "{{ requested_by }}"
+      environment: "{{ change_environment }}"
+      target_host: "{{ inventory_hostname }}"
+      maintenance_window: "{{ maintenance_window | default('not_provided') }}"
+      change_ticket_status: "{{ change_ticket_status }}"
+      firewall_change: "{{ firewall_change }}"
+      desired_rich_rule: "{{ desired_rich_rule }}"
+      precheck:
+        status: "PASS"
+        timestamp: "{{ ansible_date_time.iso8601 }}"
+        firewalld_running: true
+        rule_already_exists: "{{ rule_already_exists }}"
+        zone: "{{ firewall_zone }}"
+        current_rich_rules: "{{ current_rich_rules.stdout_lines }}"
+        current_zone_details: "{{ current_zone_details.stdout_lines }}"
+
+- name: Write state file
+  ansible.builtin.copy:
+    dest: "{{ firewall_state_file }}"
+    content: "{{ firewall_state | to_nice_json }}"
+    mode: "0644"
+
+- name: Show precheck summary
+  ansible.builtin.debug:
+    msg:
+      - "Precheck passed on {{ inventory_hostname }}"
+      - "Desired rule: {{ desired_rich_rule }}"
+      - "Rule already exists: {{ rule_already_exists }}"

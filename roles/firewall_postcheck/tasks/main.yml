@@ -1,0 +1,61 @@
+---
+- name: Read state file
+  ansible.builtin.slurp:
+    src: "{{ firewall_state_file }}"
+  register: firewall_state_raw
+
+- name: Parse state file
+  ansible.builtin.set_fact:
+    firewall_state: "{{ firewall_state_raw.content | b64decode | from_json }}"
+
+- name: Get final rich rules
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-rich-rules
+  register: final_rich_rules
+  changed_when: false
+
+- name: Get final zone details
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-all
+  register: final_zone_details
+  changed_when: false
+
+- name: Check whether desired rule exists after implementation
+  ansible.builtin.set_fact:
+    final_rule_exists: "{{ firewall_state.desired_rich_rule in final_rich_rules.stdout }}"
+
+- name: Validate final requested state
+  ansible.builtin.assert:
+    that:
+      - >
+        (firewall_change.state == 'present' and final_rule_exists) or
+        (firewall_change.state == 'absent' and not final_rule_exists)
+    fail_msg: "Postcheck failed. Final firewall state does not match requested state."
+    success_msg: "Postcheck passed. Final firewall state matches requested state."
+
+- name: Update state file after postcheck
+  ansible.builtin.set_fact:
+    firewall_state: >-
+      {{
+        firewall_state | combine({
+          'postcheck': {
+            'status': 'PASS',
+            'timestamp': ansible_date_time.iso8601,
+            'final_rule_exists': final_rule_exists,
+            'final_rich_rules': final_rich_rules.stdout_lines,
+            'final_zone_details': final_zone_details.stdout_lines
+          },
+          'final_status': 'SUCCESS'
+        }, recursive=True)
+      }}
+
+- name: Write updated state file
+  ansible.builtin.copy:
+    dest: "{{ firewall_state_file }}"
+    content: "{{ firewall_state | to_nice_json }}"
+    mode: "0644"
+
+- name: Show postcheck summary
+  ansible.builtin.debug:
+    msg:
+      - "Postcheck completed on {{ inventory_hostname }}"
+      - "Final rule exists: {{ final_rule_exists }}"
+      - "Final status: SUCCESS"

@@ -1,0 +1,64 @@
+---
+- name: Read state file
+  ansible.builtin.slurp:
+    src: "{{ firewall_state_file }}"
+  register: firewall_state_raw
+
+- name: Parse state file
+  ansible.builtin.set_fact:
+    firewall_state: "{{ firewall_state_raw.content | b64decode | from_json }}"
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ firewall_backup_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Capture current rich rules
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-rich-rules
+  register: backup_rich_rules
+  changed_when: false
+
+- name: Capture full zone details
+  ansible.builtin.command: firewall-cmd --zone={{ firewall_zone }} --list-all
+  register: backup_zone_info
+  changed_when: false
+
+- name: Save rich rules backup
+  ansible.builtin.copy:
+    dest: "{{ firewall_backup_dir }}/{{ cr_number }}_{{ inventory_hostname }}_rich_rules.bak"
+    content: "{{ backup_rich_rules.stdout }}"
+    mode: "0644"
+
+- name: Save zone info backup
+  ansible.builtin.copy:
+    dest: "{{ firewall_backup_dir }}/{{ cr_number }}_{{ inventory_hostname }}_zone_info.bak"
+    content: "{{ backup_zone_info.stdout }}"
+    mode: "0644"
+
+- name: Update state with backup details
+  ansible.builtin.set_fact:
+    firewall_state: >-
+      {{
+        firewall_state | combine({
+          'backup': {
+            'status': 'PASS',
+            'timestamp': ansible_date_time.iso8601,
+            'backup_dir': firewall_backup_dir,
+            'rich_rules_backup': firewall_backup_dir ~ '/' ~ cr_number ~ '_' ~ inventory_hostname ~ '_rich_rules.bak',
+            'zone_info_backup': firewall_backup_dir ~ '/' ~ cr_number ~ '_' ~ inventory_hostname ~ '_zone_info.bak'
+          }
+        }, recursive=True)
+      }}
+
+- name: Write updated state file
+  ansible.builtin.copy:
+    dest: "{{ firewall_state_file }}"
+    content: "{{ firewall_state | to_nice_json }}"
+    mode: "0644"
+
+- name: Show backup summary
+  ansible.builtin.debug:
+    msg:
+      - "Backup completed on {{ inventory_hostname }}"
+      - "Backup directory: {{ firewall_backup_dir }}"

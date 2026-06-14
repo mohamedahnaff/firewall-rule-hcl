@@ -1,0 +1,35 @@
+---
+- name: Read state file
+  ansible.builtin.slurp:
+    src: "{{ firewall_state_file }}"
+  register: firewall_state_raw
+
+- name: Parse state file
+  ansible.builtin.set_fact:
+    firewall_state: "{{ firewall_state_raw.content | b64decode | from_json }}"
+
+- name: Generate remote report
+  ansible.builtin.template:
+    src: firewall_report.j2
+    dest: "{{ firewall_report_dir_remote }}/firewall_change_report_{{ cr_number }}.txt"
+    mode: "0644"
+
+- name: Ensure local reports directory exists
+  ansible.builtin.file:
+    path: "./reports"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+
+- name: Fetch report to control node
+  ansible.builtin.fetch:
+    src: "{{ firewall_report_dir_remote }}/firewall_change_report_{{ cr_number }}.txt"
+    dest: "./reports/"
+    flat: false
+
+- name: Show report path
+  ansible.builtin.debug:
+    msg:
+      - "Remote report: {{ firewall_report_dir_remote }}/firewall_change_report_{{ cr_number }}.txt"
+      - "Fetched report under ./reports/"

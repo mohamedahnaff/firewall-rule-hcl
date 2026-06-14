@@ -1,0 +1,9 @@
+---
+- name: Firewall change precheck
+  hosts: linux_firewall
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/change_request.yml
+  roles:
+    - firewall_precheck

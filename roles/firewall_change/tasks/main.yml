@@ -1,0 +1,95 @@
+---
+- name: Read state file
+  ansible.builtin.slurp:
+    src: "{{ firewall_state_file }}"
+  register: firewall_state_raw
+
+- name: Parse state file
+  ansible.builtin.set_fact:
+    firewall_state: "{{ firewall_state_raw.content | b64decode | from_json }}"
+
+- name: Set desired action mapping
+  ansible.builtin.set_fact:
+    fw_decision: "{{ 'accept' if firewall_change.action == 'allow' else 'reject' }}"
+
+- name: Build desired rich rule
+  ansible.builtin.set_fact:
+    desired_rich_rule: 'rule family="{{ firewall_family }}" source address="{{ firewall_change.source }}" port port="{{ firewall_change.port }}" protocol="{{ firewall_change.protocol }}" {{ fw_decision }}'
+
+- name: Build old rule mapping if update scenario
+  ansible.builtin.set_fact:
+    old_fw_decision: "{{ 'accept' if old_rule.action == 'allow' else 'reject' }}"
+  when: old_rule.enabled | default(false)
+
+- name: Build old rich rule
+  ansible.builtin.set_fact:
+    old_rich_rule: 'rule family="{{ firewall_family }}" source address="{{ old_rule.source }}" port port="{{ old_rule.port }}" protocol="{{ old_rule.protocol }}" {{ old_fw_decision }}'
+  when: old_rule.enabled | default(false)
+
+- name: Remove old rule if update scenario
+  ansible.posix.firewalld:
+    zone: "{{ firewall_zone }}"
+    rich_rule: "{{ old_rich_rule }}"
+    permanent: true
+    immediate: true
+    state: disabled
+  when: old_rule.enabled | default(false)
+
+- name: Apply requested firewall rule when state is present
+  ansible.posix.firewalld:
+    zone: "{{ firewall_zone }}"
+    rich_rule: "{{ desired_rich_rule }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  when: firewall_change.state == 'present'
+  register: firewall_apply_present
+
+- name: Remove requested firewall rule when state is absent
+  ansible.posix.firewalld:
+    zone: "{{ firewall_zone }}"
+    rich_rule: "{{ desired_rich_rule }}"
+    permanent: true
+    immediate: true
+    state: disabled
+  when: firewall_change.state == 'absent'
+  register: firewall_apply_absent
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+  register: firewall_reload
+  changed_when: "'success' in (firewall_reload.stdout | lower)"
+
+- name: Update state after implementation
+  ansible.builtin.set_fact:
+    firewall_state: >-
+      {{
+        firewall_state | combine({
+          'implementation': {
+            'status': 'PASS',
+            'timestamp': ansible_date_time.iso8601,
+            'desired_rich_rule': desired_rich_rule,
+            'requested_state': firewall_change.state,
+            'old_rule_removed': old_rule.enabled | default(false),
+            'reload_output': firewall_reload.stdout | default('no output'),
+            'changed': (
+              firewall_apply_present.changed
+              if firewall_change.state == 'present'
+              else firewall_apply_absent.changed
+            )
+          }
+        }, recursive=True)
+      }}
+
+- name: Write state file
+  ansible.builtin.copy:
+    dest: "{{ firewall_state_file }}"
+    content: "{{ firewall_state | to_nice_json }}"
+    mode: "0644"
+
+- name: Show implementation summary
+  ansible.builtin.debug:
+    msg:
+      - "Implementation completed on {{ inventory_hostname }}"
+      - "Desired rule: {{ desired_rich_rule }}"
+      - "Requested state: {{ firewall_change.state }}"

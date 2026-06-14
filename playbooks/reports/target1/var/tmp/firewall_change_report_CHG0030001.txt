@@ -1,0 +1,55 @@
+Firewall Change Execution Report
+================================
+
+CR Number           : CHG0030001
+Requested By        : System Administrator
+Environment         : dev
+Target Host         : target1
+Maintenance Window  : 2026-06-11 15:30-16:30
+Ticket Status       : approved
+
+Requested Change
+----------------
+State               : present
+Action              : allow
+Direction           : inbound
+Protocol            : tcp
+Port                : 443
+Source              : 10.10.20.0/24
+Description         : Allow HTTPS from approved source subnet
+Desired Rich Rule   : rule family="ipv4" source address="10.10.20.0/24" port port="443" protocol="tcp" accept
+
+Precheck
+--------
+Status              : PASS
+Timestamp           : 2026-06-11T10:53:17Z
+Firewalld Running   : True
+Rule Already Exists : False
+Zone                : public
+
+Backup
+------
+Status              : PASS
+Timestamp           : 2026-06-11T10:53:23Z
+Backup Directory    : /var/tmp/firewall_backups
+Rich Rules Backup   : /var/tmp/firewall_backups/CHG0030001_target1_rich_rules.bak
+Zone Info Backup    : /var/tmp/firewall_backups/CHG0030001_target1_zone_info.bak
+
+Implementation
+--------------
+Status              : PASS
+Timestamp           : 2026-06-11T10:53:29Z
+Requested State     : present
+Changed             : True
+Reload Output       : success
+Old Rule Removed    : False
+
+Postcheck
+---------
+Status              : PASS
+Timestamp           : 2026-06-11T10:53:34Z
+Final Rule Exists   : True
+
+Final Result
+------------
+Final Status        : SUCCESS

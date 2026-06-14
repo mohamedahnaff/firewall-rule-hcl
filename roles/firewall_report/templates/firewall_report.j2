@@ -1,0 +1,55 @@
+Firewall Change Execution Report
+================================
+
+CR Number           : {{ firewall_state.cr_number }}
+Requested By        : {{ firewall_state.requested_by }}
+Environment         : {{ firewall_state.environment }}
+Target Host         : {{ firewall_state.target_host }}
+Maintenance Window  : {{ firewall_state.maintenance_window }}
+Ticket Status       : {{ firewall_state.change_ticket_status }}
+
+Requested Change
+----------------
+State               : {{ firewall_state.firewall_change.state }}
+Action              : {{ firewall_state.firewall_change.action }}
+Direction           : {{ firewall_state.firewall_change.direction }}
+Protocol            : {{ firewall_state.firewall_change.protocol }}
+Port                : {{ firewall_state.firewall_change.port }}
+Source              : {{ firewall_state.firewall_change.source }}
+Description         : {{ firewall_state.firewall_change.description }}
+Desired Rich Rule   : {{ firewall_state.desired_rich_rule }}
+
+Precheck
+--------
+Status              : {{ firewall_state.precheck.status }}
+Timestamp           : {{ firewall_state.precheck.timestamp }}
+Firewalld Running   : {{ firewall_state.precheck.firewalld_running }}
+Rule Already Exists : {{ firewall_state.precheck.rule_already_exists }}
+Zone                : {{ firewall_state.precheck.zone }}
+
+Backup
+------
+Status              : {{ firewall_state.backup.status }}
+Timestamp           : {{ firewall_state.backup.timestamp }}
+Backup Directory    : {{ firewall_state.backup.backup_dir }}
+Rich Rules Backup   : {{ firewall_state.backup.rich_rules_backup }}
+Zone Info Backup    : {{ firewall_state.backup.zone_info_backup }}
+
+Implementation
+--------------
+Status              : {{ firewall_state.implementation.status }}
+Timestamp           : {{ firewall_state.implementation.timestamp }}
+Requested State     : {{ firewall_state.implementation.requested_state }}
+Changed             : {{ firewall_state.implementation.changed }}
+Reload Output       : {{ firewall_state.implementation.reload_output }}
+Old Rule Removed    : {{ firewall_state.implementation.old_rule_removed }}
+
+Postcheck
+---------
+Status              : {{ firewall_state.postcheck.status }}
+Timestamp           : {{ firewall_state.postcheck.timestamp }}
+Final Rule Exists   : {{ firewall_state.postcheck.final_rule_exists }}
+
+Final Result
+------------
+Final Status        : {{ firewall_state.final_status }}

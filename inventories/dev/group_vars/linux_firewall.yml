@@ -1,0 +1,5 @@
+firewall_state_file: "/var/tmp/firewall_change_state.json"
+firewall_backup_dir: "/var/tmp/firewall_backups"
+firewall_report_dir_remote: "/var/tmp"
+firewall_zone: "public"
+firewall_family: "ipv4"
