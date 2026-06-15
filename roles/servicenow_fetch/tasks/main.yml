@@ -1,0 +1,74 @@
+---
+- name: Query change request by number from ServiceNow
+  ansible.builtin.uri:
+    url: "{{ snow_instance_url }}/api/now/table/change_request?sysparm_query=number={{ cr_number }}&sysparm_limit=1&sysparm_display_value=true&sysparm_exclude_reference_link=true&sysparm_fields=sys_id,number,short_description,description,state,requested_by,start_date,end_date,assignment_group,assigned_to"
+    method: GET
+    user: "{{ snow_username }}"
+    password: "{{ snow_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ snow_validate_certs }}"
+    headers:
+      Accept: "application/json"
+    return_content: true
+  register: snow_change_response
+
+- name: Ensure CR exists
+  ansible.builtin.assert:
+    that:
+      - snow_change_response.json.result | length > 0
+    fail_msg: "No change request found for {{ cr_number }}"
+    success_msg: "Change request found"
+
+- name: Set fetched CR record
+  ansible.builtin.set_fact:
+    snow_change_record: "{{ snow_change_response.json.result[0] }}"
+    snow_change_sys_id: "{{ snow_change_response.json.result[0].sys_id }}"
+
+- name: Ensure payload markers exist
+  ansible.builtin.assert:
+    that:
+      - "'AUTOMATION_PAYLOAD_START' in (snow_change_record.description | default(''))"
+      - "'AUTOMATION_PAYLOAD_END' in (snow_change_record.description | default(''))"
+    fail_msg: "Description does not contain AUTOMATION_PAYLOAD_START / AUTOMATION_PAYLOAD_END block."
+    success_msg: "Payload block found"
+
+- name: Extract payload block
+  ansible.builtin.set_fact:
+    snow_payload_text: >-
+      {{
+        snow_change_record.description
+        .split('AUTOMATION_PAYLOAD_START', 1)[1]
+        .split('AUTOMATION_PAYLOAD_END', 1)[0]
+        | trim
+      }}
+
+- name: Parse YAML payload
+  ansible.builtin.set_fact:
+    snow_payload_data: "{{ snow_payload_text | from_yaml }}"
+
+- name: Build runtime variable structure
+  ansible.builtin.set_fact:
+    runtime_change_request:
+      cr_number: "{{ snow_change_record.number }}"
+      snow_change_sys_id: "{{ snow_change_record.sys_id }}"
+      requested_by: "{{ snow_change_record.requested_by }}"
+      change_ticket_status: "approved"
+      target_host: "{{ snow_payload_data.target_host }}"
+      change_environment: "{{ snow_payload_data.change_environment }}"
+      maintenance_window: "{{ snow_payload_data.maintenance_window }}"
+      firewall_change: "{{ snow_payload_data.firewall_change }}"
+      old_rule: "{{ snow_payload_data.old_rule | default({'enabled': false}) }}"
+      snow_change_state: "{{ snow_change_record.state }}"
+      snow_short_description: "{{ snow_change_record.short_description }}"
+
+- name: Ensure runtime directory exists
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/../runtime"
+    state: directory
+    mode: "0755"
+
+- name: Write runtime vars file
+  ansible.builtin.copy:
+    dest: "{{ playbook_dir }}/../runtime/servicenow_change_request.yml"
+    content: "{{ runtime_change_request | to_nice_yaml }}"
+    mode: "0644"

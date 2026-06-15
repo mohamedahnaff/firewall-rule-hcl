@@ -1,0 +1,28 @@
+---
+- name: Fetch Change Request from ServiceNow and build runtime vars
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/servicenow.yml
+  tasks:
+    - block:
+        - name: Run ServiceNow fetch role
+          ansible.builtin.include_role:
+            name: servicenow_fetch
+
+      rescue:
+        - name: Update work note for fetch failure when sys_id is already known
+          ansible.builtin.include_role:
+            name: servicenow_update
+          vars:
+            snow_work_note_message: |
+              [AUTOMATION][FETCH_CR][FAILED]
+              CR: {{ cr_number }}
+              Stage: Fetch CR
+              Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+          when: snow_change_sys_id is defined
+
+        - name: Fail workflow after fetch failure
+          ansible.builtin.fail:
+            msg: "Fetch CR failed."

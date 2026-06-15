@@ -1,0 +1,4 @@
+snow_instance_url: "https://dev222810.service-now.com/"
+snow_username: "admin"
+snow_password: "p**XYDv2R5vx"
+snow_validate_certs: false

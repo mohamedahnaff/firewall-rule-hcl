@@ -1,0 +1,37 @@
+---
+- name: Build ServiceNow update payload
+  ansible.builtin.set_fact:
+    snow_update_payload: >-
+      {{
+        {'work_notes': snow_work_note_message}
+        | combine(
+            {'state': snow_state_value}
+            if (snow_state_value is defined and snow_state_value | string | length > 0)
+            else {}
+          )
+      }}
+
+- name: Update ServiceNow change request
+  ansible.builtin.uri:
+    url: "{{ snow_instance_url }}/api/now/table/change_request/{{ snow_change_sys_id }}"
+    method: PATCH
+    user: "{{ snow_username }}"
+    password: "{{ snow_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ snow_validate_certs }}"
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+    body_format: json
+    body: "{{ snow_update_payload }}"
+    return_content: true
+  delegate_to: localhost
+  become: false
+  register: snow_update_result
+
+- name: Show ServiceNow update result
+  ansible.builtin.debug:
+    msg:
+      - "ServiceNow update applied for {{ cr_number }}"
+      - "HTTP status: {{ snow_update_result.status }}"
+      - "Payload: {{ snow_update_payload }}"

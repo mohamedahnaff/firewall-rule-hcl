@@ -1,0 +1,19 @@
+change_environment: dev
+change_ticket_status: approved
+cr_number: CHG0030006
+firewall_change:
+    action: allow
+    description: Allow HTTPS from approved source subnet
+    direction: inbound
+    port: 443
+    protocol: tcp
+    source: 10.10.20.0/24
+    state: present
+maintenance_window: 2026-06-11 15:30-16:30
+old_rule:
+    enabled: false
+requested_by: System Administrator
+snow_change_state: Implement
+snow_change_sys_id: be9abf24c3e94350e8bdbd0ed40131cc
+snow_short_description: Firewall rule creation for application access
+target_host: target1

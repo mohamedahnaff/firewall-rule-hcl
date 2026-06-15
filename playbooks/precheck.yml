@@ -4,6 +4,26 @@
   gather_facts: true
   become: true
   vars_files:
-    - ../vars/change_request.yml
-  roles:
-    - firewall_precheck
+    - ../vars/servicenow.yml
+    - ../runtime/servicenow_change_request.yml
+  tasks:
+    - block:
+        - name: Run precheck role
+          ansible.builtin.include_role:
+            name: firewall_precheck
+
+      rescue:
+        - name: Update ServiceNow work notes for precheck failure
+          ansible.builtin.include_role:
+            name: servicenow_update
+          vars:
+            snow_work_note_message: |
+              [AUTOMATION][PRECHECK][FAILED]
+              CR: {{ cr_number }}
+              Host: {{ inventory_hostname }}
+              Stage: Precheck
+              Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+
+        - name: Fail play after updating ServiceNow
+          ansible.builtin.fail:
+            msg: "Precheck failed. ServiceNow work note updated."

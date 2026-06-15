@@ -1,0 +1,22 @@
+---
+- name: Finalize success in ServiceNow
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/servicenow.yml
+    - ../runtime/servicenow_change_request.yml
+  tasks:
+    - name: Update success work note and move CR to Review
+      ansible.builtin.include_role:
+        name: servicenow_update
+      vars:
+        snow_work_note_message: |
+          [AUTOMATION][SUCCESS]
+          CR: {{ cr_number }}
+          Target Host: {{ target_host }}
+          Requested Change: {{ firewall_change.action }} {{ firewall_change.protocol }}/{{ firewall_change.port }} from {{ firewall_change.source }}
+          Result: Firewall automation completed successfully.
+          Evidence: /var/tmp/firewall_change_report_{{ cr_number }}.txt
+          Next State: Review
+        snow_state_value: "0"

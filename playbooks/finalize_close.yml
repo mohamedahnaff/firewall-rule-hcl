@@ -1,0 +1,22 @@
+---
+- name: Finalize closure in ServiceNow
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../vars/servicenow.yml
+    - ../runtime/servicenow_change_request.yml
+  tasks:
+    - name: Update closure work note and move CR to Closed
+      ansible.builtin.include_role:
+        name: servicenow_update
+      vars:
+        snow_work_note_message: |
+          [AUTOMATION][CLOSED]
+          CR: {{ cr_number }}
+          Final Status: Closed
+          Review completed successfully.
+          Validation confirmed.
+          No rollback required.
+          Evidence: /var/tmp/firewall_change_report_{{ cr_number }}.txt
+        snow_state_value: "3"

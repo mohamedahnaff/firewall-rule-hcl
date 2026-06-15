@@ -1,6 +1,8 @@
 ---
+- import_playbook: fetch_cr.yml
 - import_playbook: precheck.yml
 - import_playbook: backup.yml
 - import_playbook: implement.yml
 - import_playbook: postcheck.yml
 - import_playbook: report.yml
+- import_playbook: finalize_success.yml
